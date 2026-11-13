@@ -1,0 +1,10 @@
+# 把应用指向集群内置的 MySQL / Redis Service
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: xiaozhi-config
+  namespace: xiaozhi
+data:
+  SPRING_DATASOURCE_DRUID_URL: "jdbc:mysql://xiaozhi-mysql:3306/xiaozhi_esp32_server?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&nullCatalogMeansCurrent=true&connectTimeout=30000&socketTimeout=30000&autoReconnect=true&failOverReadOnly=false&maxReconnects=10"
+  SPRING_DATA_REDIS_HOST: "xiaozhi-redis"
+  SPRING_DATA_REDIS_DATABASE: "0"

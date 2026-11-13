@@ -1,0 +1,80 @@
+# 可选：内置 MySQL + Redis（对应 docker-compose_all 的全模块模式）
+# 与 base 一起应用后，patch-config 会把应用指向集群内 Service
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: xiaozhi-mysql
+  namespace: xiaozhi
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xiaozhi-mysql
+  namespace: xiaozhi
+  labels:
+    app: xiaozhi-mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: xiaozhi-mysql
+  template:
+    metadata:
+      labels:
+        app: xiaozhi-mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          args:
+            - --character-set-server=utf8mb4
+            - --collation-server=utf8mb4_unicode_ci
+          env:
+            - name: TZ
+              value: "Asia/Shanghai"
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: xiaozhi-secret
+                  key: SPRING_DATASOURCE_DRUID_PASSWORD
+            - name: MYSQL_DATABASE
+              value: xiaozhi_esp32_server
+          ports:
+            - containerPort: 3306
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              memory: 2Gi
+          readinessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "localhost"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 45
+            failureThreshold: 12
+          volumeMounts:
+            - name: mysql
+              mountPath: /var/lib/mysql
+      volumes:
+        - name: mysql
+          persistentVolumeClaim:
+            claimName: xiaozhi-mysql
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: xiaozhi-mysql
+  namespace: xiaozhi
+spec:
+  selector:
+    app: xiaozhi-mysql
+  ports:
+    - port: 3306
+      targetPort: 3306

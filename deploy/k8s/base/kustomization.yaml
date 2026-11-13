@@ -1,0 +1,19 @@
+# 默认：应用 + 外部 MySQL/Redis（数据库不随应用部署）
+# 需要内置 MySQL/Redis 时改用 overlays/bundled-db
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: xiaozhi
+
+resources:
+  - namespace.yaml
+  - config.yaml
+  - secret.yaml
+  - manager-api.yaml
+  - xiaozhi-server.yaml
+
+# 国内拉不动 ghcr.io 时，加个 overlay 只换源不换 tag：
+#   images:
+#     - name: ghcr.io/xinnan-tech/xiaozhi-esp32-server
+#       newName: ghcr.nju.edu.cn/xinnan-tech/xiaozhi-esp32-server
+# （不写 newTag，两个镜像各自的 server_latest / web_latest tag 会保留）
