@@ -1,0 +1,75 @@
+# 智控台（manager-api + manager-web 合一镜像：nginx 8002 / java 8003）
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: xiaozhi-uploadfile
+  namespace: xiaozhi
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xiaozhi-manager-api
+  namespace: xiaozhi
+  labels:
+    app: xiaozhi-manager-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: xiaozhi-manager-api
+  template:
+    metadata:
+      labels:
+        app: xiaozhi-manager-api
+    spec:
+      containers:
+        - name: manager-api
+          image: ghcr.io/xinnan-tech/xiaozhi-esp32-server:web_latest
+          ports:
+            - containerPort: 8002
+            - containerPort: 8003
+          envFrom:
+            - configMapRef:
+                name: xiaozhi-config
+            - secretRef:
+                name: xiaozhi-secret
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              memory: 4Gi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8002
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          volumeMounts:
+            - name: uploadfile
+              mountPath: /uploadfile
+      volumes:
+        - name: uploadfile
+          persistentVolumeClaim:
+            claimName: xiaozhi-uploadfile
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: xiaozhi-manager-api
+  namespace: xiaozhi
+spec:
+  selector:
+    app: xiaozhi-manager-api
+  ports:
+    - name: web
+      port: 8002
+      targetPort: 8002
+    - name: api
+      port: 8003
+      targetPort: 8003

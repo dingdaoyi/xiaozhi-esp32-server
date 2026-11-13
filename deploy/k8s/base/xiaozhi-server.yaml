@@ -1,0 +1,99 @@
+# 核心语音服务（python：ws 8000 / http 8003）
+# 配置文件 data/.config.yaml 与模型 model.pt 持久化在同一 PVC：
+#   /opt/xiaozhi-esp32-server/data    <- PVC subPath data/
+#   /opt/xiaozhi-esp32-server/models  <- PVC subPath models/（initContainer 自动下载 SenseVoiceSmall）
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: xiaozhi-server-data
+  namespace: xiaozhi
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xiaozhi-server
+  namespace: xiaozhi
+  labels:
+    app: xiaozhi-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: xiaozhi-server
+  template:
+    metadata:
+      labels:
+        app: xiaozhi-server
+    spec:
+      initContainers:
+        - name: download-model
+          image: busybox:1.36
+          command: ["/bin/sh", "-c"]
+          args:
+            - >
+              mkdir -p /models/SenseVoiceSmall &&
+              if [ -f /models/SenseVoiceSmall/model.pt ]; then
+                echo "model.pt already exists, skip download";
+              else
+                echo "downloading SenseVoiceSmall model...";
+                wget -O /models/SenseVoiceSmall/model.pt
+                https://modelscope.cn/models/iic/SenseVoiceSmall/resolve/master/model.pt;
+              fi
+          volumeMounts:
+            - name: data
+              mountPath: /models
+              subPath: models
+      containers:
+        - name: xiaozhi-server
+          image: ghcr.io/xinnan-tech/xiaozhi-esp32-server:server_latest
+          securityOpt:
+            - seccomp:unconfined
+          ports:
+            - containerPort: 8000
+            - containerPort: 8003
+          env:
+            - name: TZ
+              value: "Asia/Shanghai"
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              memory: 6Gi
+          readinessProbe:
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          volumeMounts:
+            - name: data
+              mountPath: /opt/xiaozhi-esp32-server/data
+              subPath: data
+            - name: data
+              mountPath: /opt/xiaozhi-esp32-server/models
+              subPath: models
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: xiaozhi-server-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: xiaozhi-server
+  namespace: xiaozhi
+spec:
+  selector:
+    app: xiaozhi-server
+  ports:
+    - name: ws
+      port: 8000
+      targetPort: 8000
+    - name: http
+      port: 8003
+      targetPort: 8003
